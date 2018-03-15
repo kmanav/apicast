@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - OAuth2.0 Token Introspection policy [PR #619](https://github.com/3scale/apicast/pull/619)
 - New `metrics` phase that runs when prometheus is collecting metrics [PR #629](https://github.com/3scale/apicast/pull/629)
 - Validation of policy configs both in integration and unit tests [PR #646](https://github.com/3scale/apicast/pull/646)
+- Configurable caching for the token introspection policy [PR #656](https://github.com/3scale/apicast/pull/656)
 
 ## Fixed
 
