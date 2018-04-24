@@ -14,6 +14,7 @@ local concat = table.concat
 local insert = table.insert
 local len = string.len
 local format = string.format
+local pairs = pairs
 
 local http_ng = require('resty.http_ng')
 local user_agent = require('apicast.user_agent')
@@ -120,6 +121,10 @@ local function auth_path(using_oauth)
          '/transactions/authorize.xml'
 end
 
+local function report_path()
+  return '/transactions.xml'
+end
+
 local function create_token_path(service_id)
   return format('/services/%s/oauth_access_tokens.xml', service_id)
 end
@@ -166,6 +171,52 @@ function _M:authorize(...)
   local using_oauth = self.version == 'oauth'
   local auth_uri = auth_path(using_oauth)
   return call_backend_transaction(self, auth_uri, authorize_options(using_oauth), ...)
+end
+
+local function add_transaction(transactions, index, cred_type, cred, reports)
+  transactions['transactions[' .. index .. '][' .. cred_type .. ']'] = cred
+
+  for metric, value in pairs(reports) do
+    transactions['transactions[' .. index .. '][usage][' .. metric .. ']'] = value
+  end
+end
+
+local function format_transactions(reports_batch)
+  local res = {}
+
+  local transaction_index = 0
+
+  local reports_with_user_key = reports_batch.by_user_key
+
+  for user_key, metrics in pairs(reports_with_user_key) do
+    add_transaction(res, transaction_index, 'user_key', user_key, metrics)
+    transaction_index = transaction_index + 1
+  end
+
+  local reports_with_app_id = reports_batch.by_app_id
+
+  for app_id, metrics in pairs(reports_with_app_id) do
+    add_transaction(res, transaction_index, 'app_id', app_id, metrics)
+    transaction_index = transaction_index + 1
+  end
+
+  local reports_with_access_token = reports_batch.by_access_token
+
+  for access_token, metrics in pairs(reports_with_access_token) do
+    add_transaction(res, transaction_index, 'access_token', access_token, metrics)
+    transaction_index = transaction_index + 1
+  end
+
+  return res
+end
+
+function _M:report(reports_batch)
+  local http_client = self.http_client
+
+  local report_uri = build_url(self, report_path(), format_transactions(reports_batch))
+  local res = http_client.post(report_uri, '')
+
+  return res
 end
 
 --- Calls backend to create an oauth token.
